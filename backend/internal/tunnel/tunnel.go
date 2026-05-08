@@ -197,24 +197,27 @@ type bodyReader struct {
 
 func (br *bodyReader) Read(p []byte) (int, error) {
 	if len(br.buf) == 0 {
+		// Try buffered chunks first (fast path and post-Done drain).
 		select {
 		case b := <-br.r.Body:
 			br.buf = b
-		case <-br.r.Done:
-			// Drain anything still queued before reporting EOF.
+		default:
+			// Nothing buffered. If Done already fired, this is EOF (any
+			// racing last chunk would have been visible in the non-blocking
+			// receive above). Otherwise block for a chunk or termination.
 			select {
-			case b := <-br.r.Body:
-				br.buf = b
-			default:
+			case <-br.r.Done:
 				select {
 				case err := <-br.r.Err:
 					return 0, err
 				default:
 					return 0, io.EOF
 				}
+			case <-br.r.cancel:
+				return 0, ErrCancelled
+			case b := <-br.r.Body:
+				br.buf = b
 			}
-		case <-br.r.cancel:
-			return 0, ErrCancelled
 		}
 	}
 	n := copy(p, br.buf)
