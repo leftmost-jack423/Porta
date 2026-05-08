@@ -20,9 +20,13 @@ log() { printf '\033[36m[verify]\033[0m %s\n' "$*"; }
 fail() { printf '\033[31m[verify]\033[0m %s\n' "$*"; exit 1; }
 
 cleanup() {
+  # SIGTERM first so children can exit cleanly, then SIGKILL as fallback.
   [[ -n "$FAKE_PID"    ]] && kill "$FAKE_PID"    2>/dev/null || true
   [[ -n "$BACKEND_PID" ]] && kill "$BACKEND_PID" 2>/dev/null || true
-  wait 2>/dev/null || true
+  # Short grace period, then force.
+  sleep 0.5
+  [[ -n "$FAKE_PID"    ]] && kill -9 "$FAKE_PID"    2>/dev/null || true
+  [[ -n "$BACKEND_PID" ]] && kill -9 "$BACKEND_PID" 2>/dev/null || true
 }
 trap cleanup EXIT
 

@@ -17,6 +17,24 @@ export function parseShareToken(): string | null {
   return decodeURIComponent(m[1]);
 }
 
+// tokenFromInput accepts either a bare token or a full share URL
+// (https://host/s/<token>) pasted into the landing form.
+export function tokenFromInput(raw: string): string | null {
+  if (!raw) return null;
+  // URL shaped?
+  try {
+    const u = new URL(raw);
+    const m = u.pathname.match(/^\/s\/(.+)$/);
+    if (m) return decodeURIComponent(m[1]);
+  } catch {
+    // Not a URL — fall through and treat as raw token.
+  }
+  // Tokens are HMAC-shaped (letters/digits/dot/underscore/dash). Reject
+  // anything with whitespace or slashes that isn't a URL.
+  if (/^[A-Za-z0-9._-]+$/.test(raw)) return raw;
+  return null;
+}
+
 export function h(
   tag: string,
   attrs: Record<string, string | number | EventListener> = {},
